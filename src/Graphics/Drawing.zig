@@ -31,6 +31,32 @@ pub const DrawingCore = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.sdl_backend.deinit(self.sdl_backend);
+        if (self.backend == .sdl) {
+            self.sdl_backend.deinit();
+        }
+    }
+
+    pub fn render(self: *Self) void {
+        if (self.backend == .sdl) {
+            self.sdl_backend.render();
+        }
+    }
+
+    pub fn processEvents(self: *Self, engine: *api.engine.Engine) void {
+        if (self.backend == .sdl) {
+            self.sdl_backend.processEvents(engine);
+        }
+    }
+
+    pub fn checkFPSCap(self: *Self, engine: *api.engine.Engine) void {
+        if (self.backend == .sdl) {
+            self.sdl_backend.checkFPSCap(engine);
+        }
+    }
+
+    pub fn checkUpdateCap(self: *Self, engine: *api.engine.Engine) void {
+        if (self.backend == .sdl) {
+            self.sdl_backend.checkUpdateCap(engine);
+        }
     }
 };

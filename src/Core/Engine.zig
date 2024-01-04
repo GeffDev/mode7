@@ -11,6 +11,7 @@ pub const GameOptions = struct {
     res: api.util.Vector2,
     win_res: api.util.Vector2,
     win_scale: i32,
+    fullscreen: bool,
     vsync: bool,
     refresh_rate: u64,
 };
@@ -19,6 +20,10 @@ pub const Engine = struct {
     game_options: GameOptions,
 
     drawing: api.drawing.DrawingCore,
+
+    running: bool,
+    update_ready: bool,
+    render_ready: bool,
 
     const Self = @This();
 
@@ -37,5 +42,25 @@ pub const Engine = struct {
 
     pub fn deinit(self: *Self) void {
         self.drawing.deinit();
+    }
+
+    pub fn run(self: *Self, update_func: *const fn () void) EngineError!void {
+        self.running = true;
+
+        while (self.running) {
+            self.drawing.processEvents(self);
+
+            self.drawing.checkUpdateCap(self);
+            if (self.update_ready) {
+                update_func();
+            }
+
+            self.drawing.checkFPSCap(self);
+            if (self.render_ready) {
+                self.drawing.render();
+            }
+        }
+
+        self.deinit();
     }
 };
