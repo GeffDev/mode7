@@ -1,18 +1,12 @@
 const std = @import("std");
 
-const sdl = @import("deps/zig-gamedev/libs/zsdl/build.zig");
-
-var sdl_pkg: sdl.Package = undefined;
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    sdl_pkg = sdl.package(b, target, optimize, .{});
-
     const module = b.addModule("mode7", .{
         .source_file = .{ .path = sdkPath("/src/root.zig") },
-        .dependencies = &.{.{ .name = "zsdl", .module = sdl_pkg.zsdl }},
+        .dependencies = &.{},
     });
     _ = module; // autofix
 
@@ -30,8 +24,16 @@ pub fn build(b: *std.Build) void {
 }
 
 pub fn link(b: *std.Build, step: *std.build.CompileStep) void {
-    _ = b; // autofix
-    sdl_pkg.link(step);
+    if (step.target.isNativeOs() and step.target.getOsTag() == .linux) {
+        step.linkLibC();
+        step.linkSystemLibrary("SDL2");
+    } else {
+        const sdl_dep = b.dependency("sdl", .{
+            .optimize = step.optimize,
+            .target = step.target,
+        });
+        step.linkLibrary(sdl_dep.artifact("SDL2"));
+    }
 }
 
 fn sdkPath(comptime suffix: []const u8) []const u8 {

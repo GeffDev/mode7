@@ -2,6 +2,7 @@
 Typical 2D game engine
 
 ## How to use
+- If on linux, install SDL2 development libraries
 - Include repository as dependency in `build.zig.zon` (or use anonymous dependencies)
 - ```zig
     exe.addModule("mode7", mode7_dep.module("mode7"));
