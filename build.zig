@@ -5,14 +5,14 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const module = b.addModule("mode7", .{
-        .source_file = .{ .path = sdkPath("/src/root.zig") },
+        .source_file = .{ .path = sdkPath("/src/api.zig") },
         .dependencies = &.{},
     });
     _ = module; // autofix
 
     const main_tests = b.addTest(.{
         .name = "tests",
-        .root_source_file = .{ .path = "src/root.zig" },
+        .root_source_file = .{ .path = "src/api.zig" },
         .target = target,
         .optimize = optimize,
     });

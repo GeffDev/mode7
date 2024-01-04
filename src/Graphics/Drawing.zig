@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const api = @import("../api.zig");
 
 // backends
@@ -18,11 +19,14 @@ pub const DrawingCore = struct {
 
     const Self = @This();
 
-    pub fn init() GraphicsError!Self {
+    pub fn init(engine: *api.engine.Engine) GraphicsError!Self {
         return Self{
             // TODO: get rid of hardcoded sdl backend
             .backend = .sdl,
-            .sdl_backend = try sdl.SDLBackend.init(),
+            .sdl_backend = sdl.SDLBackend.init(engine) catch |err| {
+                std.log.err("failed to initialise sdl! {s}", .{@errorName(err)});
+                return GraphicsError.InitFailure;
+            },
         };
     }
 
