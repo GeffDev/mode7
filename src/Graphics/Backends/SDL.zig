@@ -6,11 +6,18 @@ const c = @cImport({
     @cInclude("SDL2/SDL.h");
 });
 
-pub const SDLError = error{ InitFailure, WindowCreationFailure, RendererCreationFailure };
+pub const SDLError = error{
+    InitFailure,
+    WindowCreationFailure,
+    RendererCreationFailure,
+    TextureCreationFailure,
+    AllocError,
+};
 
 pub const SDLBackend = struct {
     window: *c.SDL_Window,
     renderer: *c.SDL_Renderer,
+    texture: *c.SDL_Texture,
     event: c.SDL_Event,
 
     target_fps_freq: u64,
@@ -23,7 +30,7 @@ pub const SDLBackend = struct {
 
     const Self = @This();
 
-    pub fn init(engine: *api.engine.Engine) SDLError!Self {
+    pub fn init(drawing: *api.drawing.DrawingCore, engine: *api.engine.Engine, allocator: std.mem.Allocator) SDLError!Self {
         var sdl: Self = undefined;
 
         if (c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_EVENTS) != 0) {
@@ -34,13 +41,15 @@ pub const SDLBackend = struct {
         // TODO: does this fair well when rendering to non integer scales?
         _ = c.SDL_SetHint(c.SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
 
+        const flags: u32 = if (engine.game_options.borderless) c.SDL_WINDOW_ALLOW_HIGHDPI | c.SDL_WINDOW_BORDERLESS else c.SDL_WINDOW_ALLOW_HIGHDPI;
+
         sdl.window = c.SDL_CreateWindow(
             @as([*]const u8, @ptrCast(engine.game_options.game_title)),
             c.SDL_WINDOWPOS_CENTERED,
             c.SDL_WINDOWPOS_CENTERED,
             engine.game_options.win_res.x * engine.game_options.win_scale,
             engine.game_options.win_res.y * engine.game_options.win_scale,
-            c.SDL_WINDOW_ALLOW_HIGHDPI,
+            flags,
         ) orelse {
             std.log.err("SDL Error: {s}", .{c.SDL_GetError()});
             return SDLError.WindowCreationFailure;
@@ -57,6 +66,16 @@ pub const SDLBackend = struct {
             return SDLError.RendererCreationFailure;
         };
 
+        drawing.framebuffer = allocator.alloc(u16, @as(usize, @intCast(engine.game_options.res.x * engine.game_options.res.y))) catch |err| {
+            std.log.err("failed to allocate fb! {s}", .{@errorName(err)});
+            return SDLError.AllocError;
+        };
+
+        sdl.texture = c.SDL_CreateTexture(sdl.renderer, c.SDL_PIXELFORMAT_RGB565, c.SDL_TEXTUREACCESS_STREAMING, engine.game_options.res.x, engine.game_options.res.y) orelse {
+            std.log.err("SDL Error: {s}", .{c.SDL_GetError()});
+            return SDLError.TextureCreationFailure;
+        };
+
         initFPSUpdateCap(&sdl, engine);
 
         return sdl;
@@ -68,7 +87,35 @@ pub const SDLBackend = struct {
         c.SDL_Quit();
     }
 
-    pub fn render(self: *Self) void {
+    // TODO: i dont like this can we get rid of it
+    extern fn SDL_LockTexture(
+        texture: *c.SDL_Texture,
+        rect: ?*c.SDL_Rect,
+        pixels: **anyopaque,
+        pitch: *i32,
+    ) i32;
+
+    fn copyFramebuffer(self: *Self, engine: *api.engine.Engine, drawing: *api.drawing.DrawingCore) void {
+        var pitch: i32 = undefined;
+        var pixels_uncast: *anyopaque = undefined;
+
+        _ = SDL_LockTexture(self.texture, null, &pixels_uncast, &pitch);
+
+        const pixels: [*]u16 = @ptrCast(@alignCast(pixels_uncast));
+
+        for (0..@as(usize, @intCast(engine.game_options.res.x * engine.game_options.res.y))) |i| {
+            pixels[i] = drawing.framebuffer[i];
+        }
+
+        c.SDL_UnlockTexture(self.texture);
+    }
+
+    pub fn render(self: *Self, engine: *api.engine.Engine) void {
+        _ = c.SDL_RenderClear(self.renderer);
+
+        self.copyFramebuffer(engine, &engine.drawing);
+        _ = c.SDL_RenderCopy(self.renderer, self.texture, null, null);
+
         c.SDL_RenderPresent(self.renderer);
     }
 
@@ -114,7 +161,11 @@ pub const SDLBackend = struct {
             c.SDL_SetWindowSize(self.window, engine.game_options.win_res.x * engine.game_options.win_scale, engine.game_options.win_res.y * engine.game_options.win_scale);
             c.SDL_SetWindowPosition(self.window, c.SDL_WINDOWPOS_CENTERED, c.SDL_WINDOWPOS_CENTERED);
         } else {
-            _ = c.SDL_SetWindowFullscreen(self.window, c.SDL_WINDOW_FULLSCREEN_DESKTOP);
+            if (!engine.game_options.borderless) {
+                _ = c.SDL_SetWindowFullscreen(self.window, c.SDL_WINDOW_FULLSCREEN_DESKTOP);
+            } else {
+                _ = c.SDL_SetWindowFullscreen(self.window, c.SDL_WINDOW_FULLSCREEN);
+            }
             _ = c.SDL_ShowCursor(0);
         }
 

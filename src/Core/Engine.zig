@@ -12,11 +12,14 @@ pub const GameOptions = struct {
     win_res: api.util.Vector2,
     win_scale: i32,
     fullscreen: bool,
+    borderless: bool,
     vsync: bool,
     refresh_rate: u64,
 };
 
 pub const Engine = struct {
+    allocator: std.mem.Allocator,
+
     game_options: GameOptions,
 
     drawing: api.drawing.DrawingCore,
@@ -29,6 +32,8 @@ pub const Engine = struct {
 
     pub fn init(game_options: GameOptions) EngineError!Self {
         var engine: Engine = undefined;
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        engine.allocator = gpa.allocator();
 
         engine.game_options = game_options;
 
@@ -57,7 +62,7 @@ pub const Engine = struct {
 
             self.drawing.checkFPSCap(self);
             if (self.render_ready) {
-                self.drawing.render();
+                self.drawing.render(self);
             }
         }
 
