@@ -2,19 +2,16 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    const optimise = b.standardOptimizeOption(.{});
 
-    const module = b.addModule("mode7", .{
-        .source_file = .{ .path = sdkPath("/src/api.zig") },
-        .dependencies = &.{},
-    });
+    const module = b.addModule("mode7", .{ .root_source_file = .{ .path = sdkPath("/src/api.zig") }, .imports = &.{} });
     _ = module; // autofix
 
     const main_tests = b.addTest(.{
         .name = "tests",
         .root_source_file = .{ .path = "src/api.zig" },
         .target = target,
-        .optimize = optimize,
+        .optimize = optimise,
     });
     b.installArtifact(main_tests);
 
@@ -23,14 +20,16 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&test_run_cmd.step);
 }
 
-pub fn link(b: *std.Build, step: *std.build.CompileStep) void {
-    if (step.target.isNativeOs() and step.target.getOsTag() == .linux) {
+// ughhjhhihhklhhasldf
+// why can't we just pull target and optimize from step
+pub fn link(b: *std.Build, step: *std.Build.Step.Compile, optimise: std.builtin.OptimizeMode, target: std.Build.ResolvedTarget) void {
+    if (step.rootModuleTarget().os.tag == .linux) {
         step.linkLibC();
         step.linkSystemLibrary("SDL2");
     } else {
         const sdl_dep = b.dependency("sdl", .{
-            .optimize = step.optimize,
-            .target = step.target,
+            .optimize = optimise,
+            .target = target,
         });
         step.linkLibrary(sdl_dep.artifact("SDL2"));
     }

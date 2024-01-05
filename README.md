@@ -5,8 +5,8 @@ Typical 2D game engine
 - If on linux, install SDL2 development libraries
 - Include repository as dependency in `build.zig.zon` (or use anonymous dependencies)
 - ```zig
-    exe.addModule("mode7", mode7_dep.module("mode7"));
-    mode7.link(mode7_dep.builder, exe);
+    exe.root_module.addImport("mode7", mode7_dep.module("mode7"));
+    mode7.link(mode7_dep.builder, exe, optimise, target);
 
 ## TODOs
 - Implement 3D rendering
