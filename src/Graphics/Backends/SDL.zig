@@ -94,7 +94,6 @@ pub const SDLBackend = struct {
         pixels: **anyopaque,
         pitch: *i32,
     ) i32;
-
     fn copyFramebuffer(self: *Self, engine: *api.engine.Engine, drawing: *api.drawing.DrawingCore) void {
         var pitch: i32 = undefined;
         var pixels_uncast: *anyopaque = undefined;
