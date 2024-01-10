@@ -29,6 +29,11 @@ pub fn build(b: *std.Build) void {
     m7tools.root_module.addImport("mode7", module);
     link(b, m7tools, optimise, target);
 
+    m7tools.addCSourceFile(.{
+        .file = .{ .path = "deps/stb/stb_image.c" },
+        .flags = &.{},
+    });
+
     const m7tools_install = b.addInstallArtifact(m7tools, .{});
 
     const m7tools_step = b.step("m7tools", "Install m7tools");
