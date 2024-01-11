@@ -23,6 +23,7 @@ pub const Engine = struct {
     game_options: GameOptions,
 
     drawing: api.drawing.DrawingCore,
+    reader: api.reader.DataFile,
 
     running: bool,
     update_ready: bool,
@@ -37,6 +38,8 @@ pub const Engine = struct {
 
         engine.game_options = game_options;
 
+        // TODO: don't hardcode the data file name, add config file to change it
+        engine.reader = api.reader.DataFile.init("Data.msa");
         engine.drawing = api.drawing.DrawingCore.init(&engine) catch |err| {
             std.log.err("failed to initialise graphics! {s}", .{@errorName(err)});
             return EngineError.GraphicsInitFailure;
@@ -47,6 +50,7 @@ pub const Engine = struct {
 
     pub fn deinit(self: *Self) void {
         self.drawing.deinit();
+        self.reader.deinit();
     }
 
     pub fn run(self: *Self, update_func: *const fn () void) EngineError!void {

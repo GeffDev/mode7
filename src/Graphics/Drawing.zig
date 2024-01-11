@@ -9,6 +9,12 @@ pub const GraphicsError = error{
     InitFailure,
 };
 
+pub const GfxError = error{
+    FileNotFound,
+    AllocFailure,
+    InvalidFile,
+};
+
 const RenderType = enum {
     software,
     hardware,
@@ -17,6 +23,25 @@ const RenderType = enum {
 const Backend = enum {
     sdl,
 };
+
+const Colour = struct {
+    r: u8,
+    g: u8,
+    b: u8,
+};
+
+inline fn rgb888ToRgb565(r: u8, g: u8, b: u8) u16 {
+    var short: u16 = 0;
+
+    // ew again
+    var short1: u16 = r >> 3;
+    short1 <<= 11;
+    var short2: u16 = g >> 2;
+    short2 <<= 5;
+    const short3: u16 = b >> 3;
+    short = short1 | short2 | short3;
+    return short;
+}
 
 pub const DrawingCore = struct {
     backend: Backend,
@@ -70,5 +95,38 @@ pub const DrawingCore = struct {
         if (self.backend == .sdl) {
             self.sdl_backend.checkUpdateCap(engine);
         }
+    }
+};
+
+pub const Graphic = struct {
+    size: api.util.Vector2,
+    data: []Colour,
+
+    const Self = @This();
+
+    pub fn load(engine: *api.engine.Engine, file_name: []const u8, allocator: std.mem.Allocator) !Self {
+        var graphic: Self = std.mem.zeroes(Self);
+        var file = api.reader.File.load(&engine.reader, file_name, allocator) catch |err| {
+            std.log.err("failed to load m7gfx file! {s}", .{@errorName(err)});
+            return GfxError.FileNotFound;
+        };
+
+        const header: []u8 = try allocator.alloc(u8, 2);
+        try file.readByteArr(header, 2);
+        if (!std.mem.eql(u8, header, "MG")) {
+            std.log.err("{s} is not a valid m7gfx file!", .{file_name});
+            return GfxError.InvalidFile;
+        }
+        allocator.free(header);
+
+        graphic.size.x = try file.readInt(allocator);
+        graphic.size.y = try file.readInt(allocator);
+
+        file.deinit(allocator);
+        return graphic;
+    }
+
+    pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+        allocator.free(self.data);
     }
 };
