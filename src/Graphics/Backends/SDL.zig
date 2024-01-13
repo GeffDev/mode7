@@ -38,7 +38,7 @@ pub const SDLBackend = struct {
             return SDLError.InitFailure;
         }
 
-        // TODO: does this fair well when rendering to non integer scales?
+        // TODO: does this fair well when rendering to non integer resolution?
         _ = c.SDL_SetHint(c.SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
 
         const flags: u32 = if (engine.game_options.borderless) c.SDL_WINDOW_ALLOW_HIGHDPI | c.SDL_WINDOW_BORDERLESS else c.SDL_WINDOW_ALLOW_HIGHDPI;

@@ -96,6 +96,12 @@ pub const DrawingCore = struct {
             self.sdl_backend.checkUpdateCap(engine);
         }
     }
+
+    pub fn clearScreen(self: *Self, colour: Colour, engine: *api.engine.Engine) void {
+        for (0..@as(usize, @intCast(engine.game_options.res.x * engine.game_options.res.y))) |i| {
+            self.framebuffer[i] = rgb888ToRgb565(colour.r, colour.g, colour.b);
+        }
+    }
 };
 
 pub const Graphic = struct {
