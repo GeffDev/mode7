@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const GfxError = error{
     FileOpenFailure,
+    WrongChannelSpec,
     ExtNotFound,
     AllocFailure,
     FileCreationFailure,
@@ -28,6 +29,11 @@ pub fn packGfxFile(file_path: [:0]const u8, allocator: std.mem.Allocator) !void 
         return GfxError.FileOpenFailure;
     };
     std.log.info("width: {}, height: {}, channels: {}", .{ x, y, found_channels });
+
+    if (found_channels != 3) {
+        std.log.err("channels must be RGB, preferably 16 bit!", .{});
+        return GfxError.WrongChannelSpec;
+    }
 
     var f_name_pos: usize = 0;
     if (std.mem.indexOfScalar(u8, file_path, '/')) |pos| {
