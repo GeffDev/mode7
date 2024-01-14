@@ -128,6 +128,33 @@ pub const Graphic = struct {
         graphic.size.x = try file.readInt(allocator);
         graphic.size.y = try file.readInt(allocator);
 
+        graphic.data = allocator.alloc(Colour, @as(usize, @intCast(graphic.x * graphic.y))) catch {
+            std.log.err("failed to allocate pixel data for {s}", .{file_name});
+            return GfxError.AllocFailure;
+        };
+
+        var i: usize = 0;
+        for (0..@as(usize, @intCast(graphic.x * graphic.y))) |_| {
+            var colour: Colour = std.mem.zeroes(Colour);
+            colour.r = try file.readByte();
+            colour.g = try file.readByte();
+            colour.b = try file.readByte();
+            graphic.data[i] = colour;
+
+            // rle repeat sign
+            if (try file.readByte() == 0xFF) {
+                const repeat: usize = @as(usize, try file.readByte());
+
+                for (0..repeat) |_| {
+                    i += 1;
+                    graphic.data[i].r = colour.r;
+                    graphic.data[i].g = colour.g;
+                    graphic.data[i].b = colour.b;
+                }
+            }
+            // std.log.info("{} {} {}", .{ colour.r, colour.g, colour.b });
+        }
+
         file.deinit(allocator);
         return graphic;
     }
