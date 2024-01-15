@@ -7,6 +7,7 @@ const sdl = @import("Backends/SDL.zig");
 
 pub const GraphicsError = error{
     InitFailure,
+    OutOfBounds,
 };
 
 pub const GfxError = error{
@@ -97,9 +98,42 @@ pub const DrawingCore = struct {
         }
     }
 
+    pub inline fn getPixel(gfx: *Graphic, coords: api.util.Vector2) GraphicsError!u16 {
+        if (coords.x < gfx.size.x and coords.x >= 0 and coords.y < gfx.size.y and coords.y >= 0) {
+            return rgb888ToRgb565(gfx.data[@as(usize, @intCast((coords.y * gfx.size.x) + coords.x))].r, gfx.data[@as(usize, @intCast((coords.y * gfx.size.x) + coords.x))].g, gfx.data[@as(usize, @intCast((coords.y * gfx.size.x) + coords.x))].b);
+        } else {
+            return GraphicsError.OutOfBounds;
+        }
+    }
+
     pub fn clearScreen(self: *Self, colour: Colour, engine: *api.engine.Engine) void {
         for (0..@as(usize, @intCast(engine.game_options.res.x * engine.game_options.res.y))) |i| {
             self.framebuffer[i] = rgb888ToRgb565(colour.r, colour.g, colour.b);
+        }
+    }
+
+    pub fn drawSprite(self: *Self, gfx: *Graphic, sprite_pos: api.util.Vector2, sprite_res: api.util.Vector2, sprite_coords: api.util.Vector2, engine: *api.engine.Engine) GraphicsError!void {
+        var current_fb_pos = api.util.Vector2{ .x = sprite_pos.x, .y = sprite_pos.y };
+
+        for (@as(usize, @intCast(sprite_coords.y))..@as(usize, @intCast(sprite_coords.y + sprite_res.y))) |y| {
+            for (@as(usize, @intCast(sprite_coords.x))..@as(usize, @intCast(sprite_coords.x + sprite_res.x))) |x| {
+                const colour = try getPixel(gfx, .{ .x = @as(i32, @intCast(x)), .y = @as(i32, @intCast(y)) });
+
+                // 16 bit magenta (255 0 255)
+                if (colour == 0xF81F) {
+                    current_fb_pos.x += 1;
+                    continue;
+                }
+
+                if (current_fb_pos.x < engine.game_options.res.x and current_fb_pos.x >= 0 and current_fb_pos.y < engine.game_options.res.y and current_fb_pos.y >= 0) {
+                    self.framebuffer[@as(usize, @intCast((current_fb_pos.y * engine.game_options.res.x) + current_fb_pos.x))] = colour;
+                }
+
+                current_fb_pos.x += 1;
+            }
+
+            current_fb_pos.y += 1;
+            current_fb_pos.x = sprite_pos.x;
         }
     }
 };
@@ -128,31 +162,30 @@ pub const Graphic = struct {
         graphic.size.x = try file.readInt(allocator);
         graphic.size.y = try file.readInt(allocator);
 
-        graphic.data = allocator.alloc(Colour, @as(usize, @intCast(graphic.x * graphic.y))) catch {
+        graphic.data = allocator.alloc(Colour, @as(usize, @intCast(graphic.size.x * graphic.size.y))) catch {
             std.log.err("failed to allocate pixel data for {s}", .{file_name});
             return GfxError.AllocFailure;
         };
 
         var i: usize = 0;
-        for (0..@as(usize, @intCast(graphic.x * graphic.y))) |_| {
+        while (i < @as(usize, @intCast(graphic.size.x * graphic.size.y))) {
             var colour: Colour = std.mem.zeroes(Colour);
             colour.r = try file.readByte();
             colour.g = try file.readByte();
             colour.b = try file.readByte();
-            graphic.data[i] = colour;
+            const rle_sign: u8 = try file.readByte();
 
-            // rle repeat sign
-            if (try file.readByte() == 0xFF) {
+            if (rle_sign == 0xFF) {
                 const repeat: usize = @as(usize, try file.readByte());
 
                 for (0..repeat) |_| {
+                    graphic.data[i] = colour;
                     i += 1;
-                    graphic.data[i].r = colour.r;
-                    graphic.data[i].g = colour.g;
-                    graphic.data[i].b = colour.b;
                 }
+            } else {
+                graphic.data[i] = colour;
+                i += 1;
             }
-            // std.log.info("{} {} {}", .{ colour.r, colour.g, colour.b });
         }
 
         file.deinit(allocator);
